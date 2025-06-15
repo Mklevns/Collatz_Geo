@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collatz-Eisenstein Flow Diagram</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: 'Georgia', serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b35, #f7941d, #fff200, #61d836);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 16px;
+            color: #cccccc;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .control-group label {
+            font-size: 14px;
+            color: #cccccc;
+        }
+        .control-group input, .control-group select {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background: #222;
+            color: #fff;
+            font-size: 14px;
+        }
+        .generate-btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        #visualization {
+            width: 100%;
+            height: 600px;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0f0f1e 100%);
+            border-radius: 10px;
+            border: 2px solid #333;
+        }
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #61d836;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #cccccc;
+            margin-top: 5px;
+        }
+        .eisenstein-axes {
+            opacity: 0.3;
+            stroke-width: 2;
+        }
+        .trajectory {
+            fill: none;
+            stroke-width: 1.5;
+            opacity: 0.7;
+        }
+        .trajectory-point {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Collatz-Eisenstein Flow Diagram</h1>
+        <p class="subtitle">Revealing the Hidden Hexagonal Symmetry in the 3n+1 Problem</p>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Start Range</label>
+                <input type="number" id="startRange" value="1" min="1" max="10000">
+            </div>
+            <div class="control-group">
+                <label>End Range</label>
+                <input type="number" id="endRange" value="1000" min="1" max="50000">
+            </div>
+            <div class="control-group">
+                <label>Max Steps</label>
+                <input type="number" id="maxSteps" value="100" min="10" max="1000">
+            </div>
+            <div class="control-group">
+                <label>Color Mode</label>
+                <select id="colorMode">
+                    <option value="information">Information Content</option>
+                    <option value="trajectory">Trajectory Length</option>
+                    <option value="residue">Residue Class mod 7</option>
+                    <option value="residue9">Residue Class mod 9</option>
+                    <option value="spiral">Spiral Analysis</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Point Size</label>
+                <select id="pointSize">
+                    <option value="small">Small</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="large">Large</option>
+                    <option value="dynamic">Dynamic</option>
+                </select>
+            </div>
+            <button class="generate-btn" onclick="generateVisualization()">Generate Flow Diagram</button>
+        </div>
+
+        <svg id="visualization"></svg>
+
+        <div class="info-panel">
+            <h3>Mathematical Framework</h3>
+            <p><strong>Eisenstein Embedding:</strong> ψ(o_i) = a + bω where ω = e^(2πi/3) and o_i ≡ a + 3b (mod 9)</p>
+            <p><strong>Hexagonal Convergence Principle:</strong> Trajectories should align along six primary directions {±1, ±ω, ±ω²}</p>
+            <p><strong>Level Structure:</strong> N = 588 = 2² × 3 × 7² encodes the fundamental symmetries</p>
+            
+            <div class="stats" id="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalTrajectories">0</div>
+                    <div class="stat-label">Total Trajectories</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="avgLength">0</div>
+                    <div class="stat-label">Average Length</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="hexSymmetry">0%</div>
+                    <div class="stat-label">Hexagonal Alignment</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="infoContraction">0%</div>
+                    <div class="stat-label">Information Contraction</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="spiralIndex">0</div>
+                    <div class="stat-label">Spiral Coherence</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="clusterStrength">0%</div>
+                    <div class="stat-label">Geometric Clustering</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Eisenstein number system: ω = e^(2πi/3)
+        const omega = { real: -0.5, imag: Math.sqrt(3) / 2 };
+        const omega2 = { real: -0.5, imag: -Math.sqrt(3) / 2 };
+
+        // Complex number operations
+        function complexAdd(a, b) {
+            return { real: a.real + b.real, imag: a.imag + b.imag };
+        }
+
+        function complexMult(a, b) {
+            return {
+                real: a.real * b.real - a.imag * b.imag,
+                imag: a.real * b.imag + a.imag * b.real
+            };
+        }
+
+        function complexScale(c, s) {
+            return { real: c.real * s, imag: c.imag * s };
+        }
+
+        // Eisenstein embedding: map odd number to Eisenstein plane
+        function eisensteinEmbed(n) {
+            const a = n % 9;
+            const b = Math.floor(n / 9) % 9;
+            
+            // Map to Eisenstein lattice: z = a + b*ω
+            const bOmega = complexScale(omega, b);
+            return complexAdd({ real: a, imag: 0 }, bOmega);
+        }
+
+        // Information content I(n) = floor(log2(n)) + 1
+        function informationContent(n) {
+            return Math.floor(Math.log2(n)) + 1;
+        }
+
+        // Collatz function
+        function collatz(n) {
+            if (n % 2 === 0) return n / 2;
+            return 3 * n + 1;
+        }
+
+        // Generate Collatz trajectory
+        function generateTrajectory(start, maxSteps) {
+            let trajectory = [];
+            let n = start;
+            let steps = 0;
+            
+            while (n !== 1 && steps < maxSteps) {
+                if (n % 2 === 1) { // Only record odd numbers
+                    trajectory.push({
+                        value: n,
+                        position: eisensteinEmbed(n),
+                        info: informationContent(n),
+                        step: steps
+                    });
+                }
+                n = collatz(n);
+                steps++;
+            }
+            
+            // Add final 1
+            trajectory.push({
+                value: 1,
+                position: eisensteinEmbed(1),
+                info: informationContent(1),
+                step: steps
+            });
+            
+            return trajectory;
+        }
+
+        // Color schemes
+        function getTrajectoryColor(trajectory, colorMode, index) {
+            switch (colorMode) {
+                case 'information':
+                    const avgInfo = trajectory.reduce((sum, p) => sum + p.info, 0) / trajectory.length;
+                    const hue = Math.max(0, Math.min(240, 240 - avgInfo * 15));
+                    return `hsl(${hue}, 85%, 65%)`;
+                    
+                case 'trajectory':
+                    const length = trajectory.length;
+                    const lengthHue = Math.max(0, Math.min(300, length * 4));
+                    return `hsl(${lengthHue}, 90%, 55%)`;
+                    
+                case 'residue':
+                    const residue = trajectory[0].value % 7;
+                    const residueColors = ['#ff4757', '#ff6348', '#ff9f43', '#feca57', '#48dbfb', '#0abde3', '#6c5ce7'];
+                    return residueColors[residue];
+                    
+                case 'residue9':
+                    const residue9 = trajectory[0].value % 9;
+                    const residue9Colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#fab1a0', '#fd79a8', '#a29bfe', '#6c5ce7'];
+                    return residue9Colors[residue9];
+                    
+                case 'spiral':
+                    // Analyze spiral characteristics
+                    let totalAngleChange = 0;
+                    for (let i = 0; i < trajectory.length - 1; i++) {
+                        const start = trajectory[i].position;
+                        const end = trajectory[i + 1].position;
+                        const angle = Math.atan2(end.imag - start.imag, end.real - start.real);
+                        if (i > 0) {
+                            const prevStart = trajectory[i-1].position;
+                            const prevAngle = Math.atan2(start.imag - prevStart.imag, start.real - prevStart.real);
+                            totalAngleChange += Math.abs(angle - prevAngle);
+                        }
+                    }
+                    const spiralHue = (totalAngleChange * 50) % 360;
+                    return `hsl(${spiralHue}, 80%, 60%)`;
+                    
+                default:
+                    return `hsl(${index * 137.5 % 360}, 70%, 60%)`;
+            }
+        }
+
+        // Calculate hexagonal alignment score
+        function calculateHexAlignment(trajectories) {
+            const directions = [
+                { real: 1, imag: 0 },           // 1
+                { real: -0.5, imag: Math.sqrt(3)/2 },  // ω
+                { real: -0.5, imag: -Math.sqrt(3)/2 }, // ω²
+                { real: -1, imag: 0 },          // -1
+                { real: 0.5, imag: -Math.sqrt(3)/2 },  // -ω
+                { real: 0.5, imag: Math.sqrt(3)/2 }    // -ω²
+            ];
+            
+            let alignmentScore = 0;
+            let totalVectors = 0;
+            
+            trajectories.forEach(trajectory => {
+                for (let i = 0; i < trajectory.length - 1; i++) {
+                    const start = trajectory[i].position;
+                    const end = trajectory[i + 1].position;
+                    const vector = { 
+                        real: end.real - start.real, 
+                        imag: end.imag - start.imag 
+                    };
+                    
+                    const magnitude = Math.sqrt(vector.real * vector.real + vector.imag * vector.imag);
+                    if (magnitude > 0.1) { // Ignore very small movements
+                        const normalized = { real: vector.real / magnitude, imag: vector.imag / magnitude };
+                        
+                        let bestAlignment = 0;
+                        directions.forEach(dir => {
+                            const dot = normalized.real * dir.real + normalized.imag * dir.imag;
+                            bestAlignment = Math.max(bestAlignment, Math.abs(dot));
+                        });
+                        
+                        alignmentScore += bestAlignment;
+                        totalVectors++;
+                    }
+                }
+            });
+            
+            return totalVectors > 0 ? (alignmentScore / totalVectors) * 100 : 0;
+        }
+
+        // Main visualization function
+        function generateVisualization() {
+            const startRange = parseInt(document.getElementById('startRange').value);
+            const endRange = parseInt(document.getElementById('endRange').value);
+            const maxSteps = parseInt(document.getElementById('maxSteps').value);
+            const colorMode = document.getElementById('colorMode').value;
+            const pointSizeMode = document.getElementById('pointSize').value;
+
+            // Clear previous visualization
+            d3.select('#visualization').selectAll('*').remove();
+
+            const svg = d3.select('#visualization');
+            const width = svg.node().getBoundingClientRect().width;
+            const height = svg.node().getBoundingClientRect().height;
+
+            svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+            // Create scale - adjust based on range
+            const rangeSize = endRange - startRange;
+            const baseScale = Math.min(width, height) * 0.03;
+            const scale = rangeSize > 1000 ? baseScale * 0.7 : baseScale;
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            // Function to convert Eisenstein coordinates to screen coordinates
+            function toScreen(eisenstein) {
+                const x = centerX + (eisenstein.real * scale);
+                const y = centerY - (eisenstein.imag * scale);
+                return { x, y };
+            }
+
+            // Draw enhanced Eisenstein axes
+            const axisGroup = svg.append('g').attr('class', 'eisenstein-axes');
+            
+            // Six primary directions with enhanced styling
+            const directions = [
+                { real: 1, imag: 0, name: "1" },
+                { real: -0.5, imag: Math.sqrt(3)/2, name: "ω" },
+                { real: -0.5, imag: -Math.sqrt(3)/2, name: "ω²" },
+                { real: -1, imag: 0, name: "-1" },
+                { real: 0.5, imag: -Math.sqrt(3)/2, name: "-ω²" },
+                { real: 0.5, imag: Math.sqrt(3)/2, name: "-ω" }
+            ];
+
+            directions.forEach((dir, i) => {
+                const end = toScreen(complexScale(dir, 15));
+                const start = toScreen(complexScale(dir, -15));
+                
+                axisGroup.append('line')
+                    .attr('x1', start.x)
+                    .attr('y1', start.y)
+                    .attr('x2', end.x)
+                    .attr('y2', end.y)
+                    .attr('stroke', `hsl(${i * 60}, 60%, 25%)`)
+                    .attr('stroke-width', 1.5)
+                    .attr('opacity', 0.4);
+                    
+                // Add direction labels
+                const labelPos = toScreen(complexScale(dir, 12));
+                axisGroup.append('text')
+                    .attr('x', labelPos.x)
+                    .attr('y', labelPos.y)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'middle')
+                    .attr('fill', `hsl(${i * 60}, 80%, 60%)`)
+                    .attr('font-size', '10px')
+                    .attr('opacity', 0.6)
+                    .text(dir.name);
+            });
+
+            // Generate trajectories with adaptive sampling
+            const trajectories = [];
+            const maxTrajectories = Math.min(500, rangeSize); // Adaptive limit
+            const step = Math.max(1, Math.floor(rangeSize / maxTrajectories));
+
+            for (let n = startRange; n <= endRange; n += step) {
+                if (n % 2 === 1) { // Only start with odd numbers
+                    const trajectory = generateTrajectory(n, maxSteps);
+                    if (trajectory.length > 1) {
+                        trajectories.push(trajectory);
+                    }
+                }
+            }
+
+            // Enhanced trajectory drawing
+            trajectories.forEach((trajectory, index) => {
+                const color = getTrajectoryColor(trajectory, colorMode, index);
+                
+                // Create path with enhanced styling
+                const pathData = trajectory.map((point, i) => {
+                    const screen = toScreen(point.position);
+                    return `${i === 0 ? 'M' : 'L'} ${screen.x} ${screen.y}`;
+                }).join(' ');
+
+                svg.append('path')
+                    .attr('d', pathData)
+                    .attr('class', 'trajectory')
+                    .attr('stroke', color)
+                    .attr('stroke-width', rangeSize > 1000 ? 0.8 : 1.2)
+                    .attr('opacity', rangeSize > 1000 ? 0.5 : 0.7);
+
+                // Enhanced point drawing
+                trajectory.forEach((point, i) => {
+                    const screen = toScreen(point.position);
+                    let radius;
+                    
+                    switch (pointSizeMode) {
+                        case 'small':
+                            radius = 1;
+                            break;
+                        case 'large':
+                            radius = 4;
+                            break;
+                        case 'dynamic':
+                            radius = Math.max(0.5, Math.min(5, point.info / 3));
+                            break;
+                        default: // medium
+                            radius = rangeSize > 1000 ? 1.5 : 2.5;
+                    }
+                    
+                    svg.append('circle')
+                        .attr('cx', screen.x)
+                        .attr('cy', screen.y)
+                        .attr('r', radius)
+                        .attr('fill', color)
+                        .attr('class', 'trajectory-point')
+                        .attr('opacity', rangeSize > 1000 ? 0.6 : 0.8)
+                        .append('title')
+                        .text(`n=${point.value}, I(n)=${point.info}, step=${point.step}`);
+                });
+            });
+
+            // Calculate enhanced statistics
+            const totalTrajectories = trajectories.length;
+            const avgLength = trajectories.reduce((sum, t) => sum + t.length, 0) / totalTrajectories;
+            const hexAlignment = calculateHexAlignment(trajectories);
+            
+            // Calculate spiral coherence
+            let spiralCoherence = 0;
+            trajectories.forEach(trajectory => {
+                if (trajectory.length > 2) {
+                    let coherence = 0;
+                    for (let i = 1; i < trajectory.length - 1; i++) {
+                        const prev = trajectory[i-1].position;
+                        const curr = trajectory[i].position;
+                        const next = trajectory[i+1].position;
+                        
+                        const v1 = { real: curr.real - prev.real, imag: curr.imag - prev.imag };
+                        const v2 = { real: next.real - curr.real, imag: next.imag - curr.imag };
+                        
+                        const dot = v1.real * v2.real + v1.imag * v2.imag;
+                        const mag1 = Math.sqrt(v1.real * v1.real + v1.imag * v1.imag);
+                        const mag2 = Math.sqrt(v2.real * v2.real + v2.imag * v2.imag);
+                        
+                        if (mag1 > 0 && mag2 > 0) {
+                            coherence += Math.abs(dot / (mag1 * mag2));
+                        }
+                    }
+                    spiralCoherence += coherence / (trajectory.length - 2);
+                }
+            });
+            spiralCoherence = totalTrajectories > 0 ? spiralCoherence / totalTrajectories : 0;
+            
+            // Calculate geometric clustering strength
+            let clusteringStrength = 0;
+            if (colorMode === 'residue' || colorMode === 'residue9') {
+                const mod = colorMode === 'residue' ? 7 : 9;
+                const clusters = new Array(mod).fill(0).map(() => ({ count: 0, positions: [] }));
+                
+                trajectories.forEach(trajectory => {
+                    const residue = trajectory[0].value % mod;
+                    clusters[residue].count++;
+                    clusters[residue].positions.push(trajectory[0].position);
+                });
+                
+                // Calculate intra-cluster vs inter-cluster distances
+                let intraCluster = 0;
+                let interCluster = 0;
+                let intraPairs = 0;
+                let interPairs = 0;
+                
+                for (let i = 0; i < mod; i++) {
+                    for (let j = 0; j < clusters[i].positions.length; j++) {
+                        for (let k = j + 1; k < clusters[i].positions.length; k++) {
+                            const pos1 = clusters[i].positions[j];
+                            const pos2 = clusters[i].positions[k];
+                            const dist = Math.sqrt(Math.pow(pos1.real - pos2.real, 2) + Math.pow(pos1.imag - pos2.imag, 2));
+                            intraCluster += dist;
+                            intraPairs++;
+                        }
+                        
+                        for (let l = i + 1; l < mod; l++) {
+                            for (let m = 0; m < clusters[l].positions.length; m++) {
+                                const pos1 = clusters[i].positions[j];
+                                const pos2 = clusters[l].positions[m];
+                                const dist = Math.sqrt(Math.pow(pos1.real - pos2.real, 2) + Math.pow(pos1.imag - pos2.imag, 2));
+                                interCluster += dist;
+                                interPairs++;
+                            }
+                        }
+                    }
+                }
+                
+                if (intraPairs > 0 && interPairs > 0) {
+                    const avgIntra = intraCluster / intraPairs;
+                    const avgInter = interCluster / interPairs;
+                    clusteringStrength = ((avgInter - avgIntra) / avgInter) * 100;
+                }
+            }
+            
+            // Calculate information contraction
+            let totalInitialInfo = 0;
+            let totalFinalInfo = 0;
+            trajectories.forEach(t => {
+                if (t.length > 0) {
+                    totalInitialInfo += t[0].info;
+                    totalFinalInfo += t[t.length - 1].info;
+                }
+            });
+            const infoContraction = totalTrajectories > 0 ? 
+                ((totalInitialInfo - totalFinalInfo) / totalInitialInfo * 100) : 0;
+
+            document.getElementById('totalTrajectories').textContent = totalTrajectories;
+            document.getElementById('avgLength').textContent = avgLength.toFixed(1);
+            document.getElementById('hexSymmetry').textContent = hexAlignment.toFixed(1) + '%';
+            document.getElementById('infoContraction').textContent = infoContraction.toFixed(1) + '%';
+            document.getElementById('spiralIndex').textContent = (spiralCoherence * 100).toFixed(1) + '%';
+            document.getElementById('clusterStrength').textContent = clusteringStrength.toFixed(1) + '%';
+        }
+
+        // Generate initial visualization
+        generateVisualization();
+    </script>
+</body>
+</html>
